@@ -1,6 +1,7 @@
 import csv
 import spacy
 import textacy.ke
+from collections import Counter
 
 nlp = spacy.load("en_core_web_sm")
 keywords = []
@@ -23,19 +24,25 @@ def generate_keywords():
 
 def collect_phrases(doc):
     """Use Textacy keyword extraction
-    For now, limits results to 5 for each paper
     Algorithms: textrank, yake, scake
     Ref: https://chartbeat-labs.github.io/textacy/build/html/api_reference/information_extraction.html
     """
-    tuples = textacy.ke.scake(doc, topn=10)
-    phrases = "|".join([tuple[0] for tuple in tuples[:4]])
+    scake = [tuple[0] for tuple in textacy.ke.scake(doc, topn=10)]
+    textrank =  [tuple[0] for tuple in textacy.ke.textrank(doc, topn=10)]
+    yake =  [tuple[0] for tuple in textacy.ke.yake(doc, topn=10)]
+    counts = Counter(scake + textrank + yake)
+    # Keep phrases identified by at least one algorithm and 
+    # exclude single words unless acronyms or hyphenated
+    filtered_phrases = [k for k, v in counts.items() if v > 1 and (' ' in k or '-' in k or k.isupper())]
+
+    phrases = "|".join(filtered_phrases[:4])
 
     return phrases
 
 def to_csv(keywords):
     columns = ["UID", "generated_keywords"]
     # For now, append algorithm used to the filename
-    keyword_file = "../sitedata/generated_keywords_scake.csv"
+    keyword_file = "../sitedata/generated_keywords_filtered.csv"
     try:
         with open(keyword_file, "w") as f:
             writer = csv.DictWriter(f, fieldnames=columns)
